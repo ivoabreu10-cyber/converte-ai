@@ -114,6 +114,7 @@ def layout_base(conteudo_pagina, ferramenta_ativa):
     <!DOCTYPE html>
     <html lang="pt-br">
     <head>
+        <meta name="google-site-verification" content="aS2P031kVY2N7PIOuVGnvwyjImWcpOz8MRl7p9sTLAg" />
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Converte Ai - Conversor de Arquivos Online Grátis</title>
