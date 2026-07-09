@@ -261,6 +261,29 @@ def layout_base(conteudo_pagina, ferramenta_ativa):
                 document.getElementById('loader').style.display = 'block';
                 document.getElementById('submit-btn').style.display = 'none';
             }}
+        <script>
+            function handleFileSelect(input, displayId) {
+                const display = document.getElementById(displayId);
+                if (input.files && input.files.length > 0) {
+                    display.textContent = input.files.length === 1 ? "Selecionado: " + input.files[0].name : input.files.length + " arquivos selecionados";
+                } else { display.textContent = ""; }
+            }
+            
+            function showLoader() {
+                const loader = document.getElementById('loader');
+                const btn = document.getElementById('submit-btn');
+                
+                // 1. Mostra o looping e esconde o botão de converter
+                loader.style.display = 'block';
+                btn.style.display = 'none';
+                
+                // 2. Aguarda 6 segundos (tempo para o Render processar arquivos de até 10MB) 
+                // e restaura a tela ao estado original após o download iniciar
+                setTimeout(function() {
+                    loader.style.display = 'none';
+                    btn.style.display = 'block';
+                }, 6000); 
+            }
         </script>
     </head>
     <body>
