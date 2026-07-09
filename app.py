@@ -72,7 +72,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Intercepta arquivos maiores que 10MB antes de sobrecarregar o Render
 @app.errorhandler(413)
 def request_entity_too_large(error):
-    # Injeta uma resposta direta de erro com o layout padrão do site
     conteudo_erro = f'''
         <h3 class="tool-title" style="color: #dc2626;"><i class="fa-solid fa-triangle-exclamation"></i> Arquivo Muito Grande</h3>
         <p class="tool-desc">O servidor bloqueou o upload porque o arquivo ultrapassa o limite de <strong>{MAX_FILE_SIZE_MB} MB</strong> configurado para proteger o processador.</p>
@@ -236,6 +235,7 @@ def layout_base(conteudo_pagina, ferramenta_ativa):
             .ad-banner-bottom {{
                 width: 100%; padding: 20px 0; background-color: #f1f5f9;
                 border-top: 1px solid var(--border-color); text-align: center; margin-top: auto;
+                box-sizing: border-box;
             }}
             .ad-box {{
                 background: #e2e8f0; border: 1px dashed #cbd5e1; color: #94a3b8;
@@ -251,17 +251,6 @@ def layout_base(conteudo_pagina, ferramenta_ativa):
             .loader-text {{ font-size: 12px; color: var(--text-muted); }}
         </style>
         <script>
-            function handleFileSelect(input, displayId) {{
-                const display = document.getElementById(displayId);
-                if (input.files && input.files.length > 0) {{
-                    display.textContent = input.files.length === 1 ? "Selecionado: " + input.files[0].name : input.files.length + " arquivos selecionados";
-                }} else {{ display.textContent = ""; }}
-            }}
-            function showLoader() {{
-                document.getElementById('loader').style.display = 'block';
-                document.getElementById('submit-btn').style.display = 'none';
-            }}
-        <script>
             function handleFileSelect(input, displayId) {
                 const display = document.getElementById(displayId);
                 if (input.files && input.files.length > 0) {
@@ -273,12 +262,9 @@ def layout_base(conteudo_pagina, ferramenta_ativa):
                 const loader = document.getElementById('loader');
                 const btn = document.getElementById('submit-btn');
                 
-                // 1. Mostra o looping e esconde o botão de converter
                 loader.style.display = 'block';
                 btn.style.display = 'none';
                 
-                // 2. Aguarda 6 segundos (tempo para o Render processar arquivos de até 10MB) 
-                // e restaura a tela ao estado original após o download iniciar
                 setTimeout(function() {
                     loader.style.display = 'none';
                     btn.style.display = 'block';
@@ -692,9 +678,9 @@ def word_to_pdf():
         pdf_render = SimpleDocTemplate(caminho_pdf, pagesize=letter)
         styles = getSampleStyleSheet()
         story = []
-        for parágrafo in doc_word.paragraphs:
-            if parágrafo.text.strip():
-                story.append(Paragraph(parágrafo.text, styles['Normal']))
+        for paragrafo in doc_word.paragraphs:
+            if paragrafo.text.strip():
+                story.append(Paragraph(paragrafo.text, styles['Normal']))
                 story.append(Spacer(1, 10))
         pdf_render.build(story)
         return send_file(caminho_pdf, as_attachment=True, download_name=nome_pdf)
@@ -707,11 +693,11 @@ def word_to_pdf():
 def excel_to_pdf_view():
     conteudo = f'''
         <h3 class="tool-title">Excel para PDF</h3>
-        <p class="tool-desc">Transforme suas planilhas operacionais e tabelas do Excel (.xlsx) em PDF.</p>
+        <p class="tool-desc">Converta suas planilhas do Excel (.xlsx) diretamente em um documento PDF.</p>
         <form action="/excel-to-pdf" method="post" enctype="multipart/form-data" onsubmit="showLoader()">
             <div class="file-dropzone">
-                <i class="fa-solid fa-file-pdf"></i>
-                <p>Selecione a planilha Excel (.xlsx)</p>
+                <i class="fa-solid fa-file-excel"></i>
+                <p>Selecione a planilha do Excel (.xlsx)</p>
                 <small>Limite máximo: {MAX_FILE_SIZE_MB}MB</small>
                 <input type="file" name="arquivo_xlsx" accept=".xlsx" required onchange="handleFileSelect(this, 'file-name')">
                 <div id="file-name" class="file-name-display"></div>
@@ -738,22 +724,26 @@ def excel_to_pdf():
         pdf_render = SimpleDocTemplate(caminho_pdf, pagesize=letter)
         styles = getSampleStyleSheet()
         story = []
+        
         dados_tabela = []
         for linha in ws.iter_rows(values_only=True):
             linha_limpa = [str(celula) if celula is not None else "" for celula in linha]
-            if any(linha_limpa): dados_tabela.append(linha_limpa)
+            if any(linha_limpa):  # Ignora linhas totalmente vazias
+                dados_tabela.append(linha_limpa)
+                
         if dados_tabela:
             t = Table(dados_tabela)
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,0), colors.grey),
                 ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
                 ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.black)
+                ('BOTTOMPADDING', (0,0), (-1,0), 6),
+                ('GRID', (0,0), (-1,-1), 1, colors.lightgrey)
             ]))
             story.append(t)
         else:
-            story.append(Paragraph("Planilha sem dados estruturados.", styles['Normal']))
+            story.append(Paragraph("A planilha selecionada está vazia.", styles['Normal']))
+            
         pdf_render.build(story)
         return send_file(caminho_pdf, as_attachment=True, download_name=nome_pdf)
     except Exception as e:
@@ -761,8 +751,6 @@ def excel_to_pdf():
     finally:
         if os.path.exists(caminho_xlsx): os.remove(caminho_xlsx)
 
-# ==============================================================================
-# INICIALIZAÇÃO DO SERVIDOR
-# ==============================================================================
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Roda localmente apenas se chamado direto
+    app.run(debug=True)
