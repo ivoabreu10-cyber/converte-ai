@@ -1,10 +1,9 @@
 import os
 import zipfile
-import pythoncom
 from flask import Flask, render_template, request, send_file
 
 # ==============================================================================
-# IMPORTAÇÃO SEGURA DE BIBLIOTECAS
+# IMPORTAÇÃO SEGURA DE BIBLIOTECAS (NATIVAS PARA LINUX/NUVEM)
 # ==============================================================================
 try:
     from PIL import Image
@@ -36,9 +35,10 @@ except ImportError:
     pdfplumber = None
 
 try:
-    from openpyxl import Workbook
+    from openpyxl import Workbook, load_workbook
 except ImportError:
     Workbook = None
+    load_workbook = None
 
 try:
     import fitz  # PyMuPDF
@@ -52,15 +52,19 @@ except ImportError:
     Presentation = None
     Inches = None
 
+# Bibliotecas alternativas para gerar PDF no Linux sem depender do Office do Windows
 try:
-    from docx2pdf import convert as docx_to_pdf_convert
+    from docx import Document
 except ImportError:
-    docx_to_pdf_convert = None
+    Document = None
 
 try:
-    import win32com.client
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
 except ImportError:
-    win32com = None
+    SimpleDocTemplate = None
 
 # ==============================================================================
 # CONFIGURAÇÃO DO APP
@@ -655,7 +659,7 @@ def pdf_to_image():
         if os.path.exists(caminho_pdf): os.remove(caminho_pdf)
 
 # ==============================================================================
-# ROTA 8: WORD PARA PDF
+# ROTA 8: WORD PARA PDF (VERSÃO SEGURA PARA NUVEM LINUX)
 # ==============================================================================
 @app.route('/word-to-pdf-view')
 def word_to_pdf_view():
@@ -676,7 +680,8 @@ def word_to_pdf_view():
 
 @app.route('/word-to-pdf', methods=['POST'])
 def word_to_pdf():
-    if docx_to_pdf_convert is None: return "Erro: Biblioteca 'docx2pdf' não instalada.", 500
+    if Document is None or SimpleDocTemplate is None: 
+        return "Erro: Bibliotecas 'python-docx' ou 'reportlab' ausentes no servidor Linux.", 500
     arquivo = request.files['arquivo_docx']
     if arquivo.filename == '': return 'Arquivo inválido', 400
     
@@ -686,16 +691,26 @@ def word_to_pdf():
     caminho_pdf = os.path.join(UPLOAD_FOLDER, nome_pdf)
     
     try:
-        pythoncom.CoInitialize()
-        docx_to_pdf_convert(caminho_docx, caminho_pdf)
+        doc_word = Document(caminho_docx)
+        pdf_render = SimpleDocTemplate(caminho_pdf, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        for parágrafo in doc_word.paragraphs:
+            if parágrafo.text.strip():
+                texto_p = Paragraph(parágrafo.text, styles['Normal'])
+                story.append(texto_p)
+                story.append(Spacer(1, 10))
+                
+        pdf_render.build(story)
         return send_file(caminho_pdf, as_attachment=True, download_name=nome_pdf)
     except Exception as e:
-        return f'Erro: {str(e)}. Verifique se possui o Microsoft Word instalado.', 500
+        return f'Erro no processamento Linux: {str(e)}', 500
     finally:
         if os.path.exists(caminho_docx): os.remove(caminho_docx)
 
 # ==============================================================================
-# ROTA 9: EXCEL PARA PDF
+# ROTA 9: EXCEL PARA PDF (FINALIZADA E CORRIGIDA)
 # ==============================================================================
 @app.route('/excel-to-pdf-view')
 def excel_to_pdf_view():
@@ -716,7 +731,8 @@ def excel_to_pdf_view():
 
 @app.route('/excel-to-pdf', methods=['POST'])
 def excel_to_pdf():
-    if win32com is None: return "Erro: pywin32 indisponível.", 500
+    if load_workbook is None or SimpleDocTemplate is None: 
+        return "Erro: Bibliotecas 'openpyxl' ou 'reportlab' ausentes.", 500
     arquivo = request.files['arquivo_xlsx']
     if arquivo.filename == '': return 'Arquivo inválido', 400
     
@@ -726,106 +742,41 @@ def excel_to_pdf():
     caminho_pdf = os.path.join(UPLOAD_FOLDER, nome_pdf)
     
     try:
-        pythoncom.CoInitialize()
-        excel = win32com.client.Dispatch("Excel.Application")
-        excel.Visible = False
-        excel.DisplayAlerts = False
+        wb = load_workbook(caminho_xlsx, data_only=True)
+        ws = wb.active
         
-        wb = excel.Workbooks.Open(os.path.abspath(caminho_xlsx))
-        wb.ExportAsFixedFormat(0, os.path.abspath(caminho_pdf))
-        wb.Close(False)
-        excel.Quit()
+        pdf_render = SimpleDocTemplate(caminho_pdf, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = []
+        
+        dados_tabela = []
+        for linha in ws.iter_rows(values_only=True):
+            linha_limpa = [str(celula) if celula is not None else "" for celula in linha]
+            if any(linha_limpa): 
+                dados_tabela.append(linha_limpa)
+                
+        if dados_tabela:
+            t = Table(dados_tabela)
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.grey),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                ('GRID', (0,0), (-1,-1), 0.5, colors.black)
+            ]))
+            story.append(t)
+        else:
+            story.append(Paragraph("Planilha vazia ou sem dados estruturados.", styles['Normal']))
+            
+        pdf_render.build(story)
         return send_file(caminho_pdf, as_attachment=True, download_name=nome_pdf)
     except Exception as e:
-        return f'Erro: {str(e)}. Verifique se possui o Microsoft Excel instalado.', 500
+        return f'Erro na conversão: {str(e)}', 500
     finally:
         if os.path.exists(caminho_xlsx): os.remove(caminho_xlsx)
 
 # ==============================================================================
-# ROTA 10: PPTX PARA PDF
+# INICIALIZAÇÃO LOCAL DO SERVIDOR
 # ==============================================================================
-@app.route('/pptx-to-pdf-view')
-def pptx_to_pdf_view():
-    conteudo = '''
-        <h3 class="tool-title">PowerPoint para PDF</h3>
-        <p class="tool-desc">Exporte seus slides de apresentações (.pptx) para um documento PDF estável.</p>
-        <form action="/pptx-to-pdf" method="post" enctype="multipart/form-data" onsubmit="showLoader()">
-            <div class="file-dropzone">
-                <i class="fa-solid fa-file-pdf"></i>
-                <p>Selecione a apresentação (.pptx)</p>
-                <input type="file" name="arquivo_pptx" accept=".pptx" required onchange="handleFileSelect(this, 'file-name')">
-                <div id="file-name" class="file-name-display"></div>
-            </div>
-            <button type="submit" id="submit-btn">Converter para PDF</button>
-        </form>
-    '''
-    return layout_base(conteudo, 'pptx-to-pdf')
-
-@app.route('/pptx-to-pdf', methods=['POST'])
-def pptx_to_pdf():
-    if win32com is None: return "Erro: pywin32 indisponível.", 500
-    arquivo = request.files['arquivo_pptx']
-    if arquivo.filename == '': return 'Arquivo inválido', 400
-    
-    caminho_pptx = os.path.join(UPLOAD_FOLDER, arquivo.filename)
-    arquivo.save(caminho_pptx)
-    nome_pdf = os.path.splitext(arquivo.filename)[0] + '.pdf'
-    caminho_pdf = os.path.join(UPLOAD_FOLDER, nome_pdf)
-    
-    try:
-        pythoncom.CoInitialize()
-        powerpoint = win32com.client.Dispatch("Powerpoint.Application")
-        
-        ppt = powerpoint.Presentations.Open(os.path.abspath(caminho_pptx), WithWindow=False)
-        ppt.SaveAs(os.path.abspath(caminho_pdf), 32)
-        ppt.Close()
-        powerpoint.Quit()
-        return send_file(caminho_pdf, as_attachment=True, download_name=nome_pdf)
-    except Exception as e:
-        return f'Erro: {str(e)}. Verifique se possui o Microsoft PowerPoint instalado.', 500
-    finally:
-        if os.path.exists(caminho_pptx): os.remove(caminho_pptx)
-
-# ==============================================================================
-# ROTA 11: MP4 PARA MP3
-# ==============================================================================
-@app.route('/mp4-to-mp3-view')
-def mp4_to_mp3_view():
-    conteudo = '''
-        <h3 class="tool-title">MP4 para MP3</h3>
-        <p class="tool-desc">Extraia as faixas de áudio das suas mídias de vídeo e salve em MP3 leve.</p>
-        <form action="/converter-audio" method="post" enctype="multipart/form-data" onsubmit="showLoader()">
-            <div class="file-dropzone">
-                <i class="fa-solid fa-music"></i>
-                <p>Selecione o vídeo MP4</p>
-                <input type="file" name="video_usuario" accept=".mp4" required onchange="handleFileSelect(this, 'file-name')">
-                <div id="file-name" class="file-name-display"></div>
-            </div>
-            <button type="submit" id="submit-btn">Extrair Áudio (MP3)</button>
-        </form>
-    '''
-    return layout_base(conteudo, 'mp4-to-mp3')
-
-@app.route('/converter-audio', methods=['POST'])
-def converter_audio():
-    if VideoFileClip is None: return "Erro: Biblioteca MoviePy ausente.", 500
-    arquivo = request.files['video_usuario']
-    if arquivo.filename == '': return 'Arquivo inválido', 400
-    
-    caminho_video = os.path.join(UPLOAD_FOLDER, arquivo.filename)
-    arquivo.save(caminho_video)
-    nome_audio = os.path.splitext(arquivo.filename)[0] + '.mp3'
-    caminho_audio = os.path.join(UPLOAD_FOLDER, nome_audio)
-    
-    try:
-        video = VideoFileClip(caminho_video)
-        video.audio.write_audiofile(caminho_audio, codec='mp3')
-        video.close()
-        return send_file(caminho_audio, as_attachment=True, download_name=nome_audio)
-    except Exception as e:
-        return f'Erro ao extrair áudio: {str(e)}', 500
-    finally:
-        if os.path.exists(caminho_video): os.remove(caminho_video)
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
