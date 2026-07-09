@@ -63,24 +63,23 @@ except ImportError:
 app = Flask(__name__)
 app.secret_key = "converte_ai_chave_secreta_segura"
 
-MAX_FILE_SIZE_MB = 10  # Proteção do processador do Render
+MAX_FILE_SIZE_MB = 10  
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE_MB * 1024 * 1024
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Intercepta arquivos maiores que 10MB antes de sobrecarregar o Render
 @app.errorhandler(413)
 def request_entity_too_large(error):
     conteudo_erro = f'''
         <h3 class="tool-title" style="color: #dc2626;"><i class="fa-solid fa-triangle-exclamation"></i> Arquivo Muito Grande</h3>
-        <p class="tool-desc">O servidor bloqueou o upload porque o arquivo ultrapassa o limite de <strong>{MAX_FILE_SIZE_MB} MB</strong> configurado para proteger o processador.</p>
+        <p class="tool-desc">O arquivo ultrapassa o limite de <strong>{MAX_FILE_SIZE_MB} MB</strong>.</p>
         <a href="/" style="display: inline-block; background: var(--primary); color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 10px;">Voltar ao Início</a>
     '''
     return layout_base(conteudo_erro, ''), 413
 
 # ==============================================================================
-# INTERFACE BASE UNIFICADA (Dispensa arquivo index.html externo)
+# INTERFACE BASE UNIFICADA
 # ==============================================================================
 def layout_base(conteudo_pagina, ferramenta_ativa):
     menu_items = {
@@ -263,6 +262,12 @@ def layout_base(conteudo_pagina, ferramenta_ativa):
             
             loader.style.display = 'block';
             btn.style.display = 'none';
+            
+            // Quebra o looping de espera infinita após o download iniciar de forma segura
+            setTimeout(function() {{
+                loader.style.display = 'none';
+                btn.style.display = 'block';
+            }}, 6000);
         }}
     </script>
 </head>
@@ -311,7 +316,6 @@ def layout_base(conteudo_pagina, ferramenta_ativa):
 # ==============================================================================
 @app.route('/sitemap.xml', methods=['GET'])
 def sitemap():
-    """Gera o mapa XML de maneira dinâmica para indexação em indexadores de busca."""
     host = request.host_url.rstrip('/')
     rotas = [
         '/', '/juntar-view', '/dividir-view', '/pdf-to-word-view', 
@@ -329,7 +333,7 @@ def sitemap():
         xml_linhas.append('    <priority>0.8</priority>')
         xml_linhas.append('  </url>')
         
-    xml_linhas.append('</urlset>')
+    xml_linhas.append('<urlset>')
     xml_completo = "\n".join(xml_linhas)
     
     return Response(xml_completo, mimetype='application/xml')
@@ -750,7 +754,7 @@ def excel_to_pdf():
         dados_tabela = []
         for linha in ws.iter_rows(values_only=True):
             linha_limpa = [str(celula) if celula is not None else "" for celula in linha]
-            if any(linha_limpa):  # Ignora linhas totalmente vazias
+            if any(linha_limpa):  
                 dados_tabela.append(linha_limpa)
                 
         if dados_tabela:
