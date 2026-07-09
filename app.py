@@ -1,6 +1,6 @@
 import os
 import zipfile
-from flask import Flask, request, send_file, flash, redirect, url_for
+from flask import Flask, request, send_file, flash, redirect, url_for, Response
 
 # ==============================================================================
 # IMPORTAÇÃO SEGURA DE BIBLIOTECAS (NATIVAS PARA LINUX/NUVEM)
@@ -109,208 +109,230 @@ def layout_base(conteudo_pagina, ferramenta_ativa):
             active_class = "active" if ferramenta_ativa == key else ""
             sidebar_html += f'<a href="{route}" class="menu-item {active_class}"><i class="fa-solid {icon}"></i>{label}</a>'
     
-    return f'''
-    <!DOCTYPE html>
-    <html lang="pt-br">
-    <head>
-        <meta name="google-site-verification" content="aS2P031kVY2N7PIOuVGnvwyjImWcpOz8MRl7p9sTLAg" />
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Converte Ai - Conversor de Arquivos Online Grátis</title>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-        <style>
-            :root {{
-                --primary-dark: #0f172a;
-                --primary: #1d4ed8;
-                --primary-light: #eff6ff;
-                --accent: #2563eb;
-                --bg-main: #f8fafc;
-                --bg-card: #ffffff;
-                --text-dark: #1e293b;
-                --text-muted: #64748b;
-                --border-color: #e2e8f0;
-                --sidebar-width: 260px;
-                --ad-width: 180px;
-            }}
-            body {{
-                font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-                margin: 0; padding: 0;
-                background-color: var(--bg-main);
-                color: var(--text-dark);
-                display: flex;
-                min-height: 100vh;
-            }}
-            .sidebar {{
-                width: var(--sidebar-width);
-                background-color: var(--primary-dark);
-                color: #f1f5f9;
-                display: flex; flex-direction: column;
-                position: fixed;
-                height: 100vh;
-                overflow-y: auto;
-                z-index: 100;
-            }}
-            .sidebar-header {{
-                padding: 24px;
-                display: flex; align-items: center; gap: 10px;
-                border-bottom: 1px solid #1e293b;
-            }}
-            .sidebar-header i {{ font-size: 24px; color: #60a5fa; }}
-            .sidebar-header h1 {{ font-size: 20px; margin: 0; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }}
-            .sidebar-header h1 span {{ color: #3b82f6; }}
-            .menu-category {{
-                font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
-                color: #475569; padding: 16px 24px 6px; font-weight: 700;
-            }}
-            .menu-item {{
-                display: flex; align-items: center; gap: 12px;
-                padding: 10px 24px; color: #94a3b8; text-decoration: none;
-                font-size: 14px; font-weight: 500; transition: all 0.15s ease;
-            }}
-            .menu-item:hover {{ background-color: #1e293b; color: #f8fafc; }}
-            .menu-item.active {{
-                background-color: var(--primary);
-                color: #ffffff; border-radius: 6px;
-                margin: 2px 12px; padding: 10px 12px;
-            }}
-            .menu-item i {{ font-size: 15px; width: 20px; text-align: center; }}
+    html_retorno = f'''<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta name="google-site-verification" content="aS2P031kVY2N7PIOuVGnvwyjImWcpOz8MRl7p9sTLAg" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Converte Ai - Conversor de Arquivos Online Grátis</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {{
+            --primary-dark: #0f172a;
+            --primary: #1d4ed8;
+            --primary-light: #eff6ff;
+            --accent: #2563eb;
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --sidebar-width: 260px;
+            --ad-width: 180px;
+        }}
+        body {{
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            margin: 0; padding: 0;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            display: flex;
+            min-height: 100vh;
+        }}
+        .sidebar {{
+            width: var(--sidebar-width);
+            background-color: var(--primary-dark);
+            color: #f1f5f9;
+            display: flex; flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            z-index: 100;
+        }}
+        .sidebar-header {{
+            padding: 24px;
+            display: flex; align-items: center; gap: 10px;
+            border-bottom: 1px solid #1e293b;
+        }}
+        .sidebar-header i {{ font-size: 24px; color: #60a5fa; }}
+        .sidebar-header h1 {{ font-size: 20px; margin: 0; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; }}
+        .sidebar-header h1 span {{ color: #3b82f6; }}
+        .menu-category {{
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+            color: #475569; padding: 16px 24px 6px; font-weight: 700;
+        }}
+        .menu-item {{
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 24px; color: #94a3b8; text-decoration: none;
+            font-size: 14px; font-weight: 500; transition: all 0.15s ease;
+        }}
+        .menu-item:hover {{ background-color: #1e293b; color: #f8fafc; }}
+        .menu-item.active {{
+            background-color: var(--primary);
+            color: #ffffff; border-radius: 6px;
+            margin: 2px 12px; padding: 10px 12px;
+        }}
+        .menu-item i {{ font-size: 15px; width: 20px; text-align: center; }}
+        
+        .main-wrapper {{
+            margin-left: var(--sidebar-width);
+            margin-right: var(--ad-width);
+            flex-grow: 1;
+            display: flex; flex-direction: column;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }}
+        
+        .hero-section {{
+            background-color: #ffffff;
+            border-bottom: 1px solid var(--border-color);
+            padding: 40px; text-align: left;
+        }}
+        .hero-container {{ max-width: 800px; margin: 0 auto; }}
+        .hero-section h2 {{ margin: 0 0 10px 0; font-size: 28px; font-weight: 800; color: var(--primary-dark); }}
+        .hero-section p {{ margin: 0; font-size: 15px; color: var(--text-muted); line-height: 1.6; }}
+        
+        .content-area {{
+            flex-grow: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 40px; box-sizing: border-box;
+        }}
+        .tool-container {{
+            background: var(--bg-card);
+            padding: 40px; border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+            max-width: 460px; width: 100%; text-align: center;
+        }}
+        .tool-title {{ color: var(--primary-dark); margin: 0 0 8px 0; font-size: 20px; font-weight: 700; }}
+        .tool-desc {{ color: var(--text-muted); font-size: 13px; margin-bottom: 24px; line-height: 1.4; }}
+        
+        .file-dropzone {{
+            border: 2px dashed #cbd5e1; background-color: var(--primary-light);
+            border-radius: 10px; padding: 30px 20px; margin-bottom: 24px;
+            cursor: pointer; transition: all 0.2s ease; position: relative;
+        }}
+        .file-dropzone:hover {{ border-color: var(--primary); background-color: #e0f2fe; }}
+        .file-dropzone i {{ font-size: 36px; color: var(--primary); margin-bottom: 10px; }}
+        .file-dropzone p {{ margin: 0; font-size: 14px; color: #334155; font-weight: 500; }}
+        .file-dropzone small {{ display: block; margin-top: 5px; color: var(--text-muted); font-size: 11px; }}
+        .file-dropzone input[type="file"] {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }}
+        .file-name-display {{ margin-top: 8px; font-size: 13px; color: var(--primary); font-weight: 600; word-break: break-all; }}
+        
+        button {{
+            background-color: var(--primary); color: white; border: none; padding: 12px 24px;
+            border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; width: 100%;
+            transition: background 0.15s ease;
+        }}
+        button:hover {{ background-color: var(--accent); }}
+        
+        .ad-sidebar-right {{
+            position: fixed; right: 0; top: 0; width: var(--ad-width); height: 100vh;
+            background-color: #f1f5f9; border-left: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: center; z-index: 90;
+        }}
+        .ad-banner-bottom {{
+            width: 100%; padding: 20px 0; background-color: #f1f5f9;
+            border-top: 1px solid var(--border-color); text-align: center; margin-top: auto;
+            box-sizing: border-box;
+        }}
+        .ad-box {{
+            background: #e2e8f0; border: 1px dashed #cbd5e1; color: #94a3b8;
+            font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
+            display: flex; align-items: center; justify-content: center; border-radius: 4px;
+        }}
+        .ad-vertical {{ width: 160px; height: 600px; }}
+        .ad-horizontal {{ width: 728px; height: 90px; margin: 0 auto; }}
+        
+        .loader-container {{ display: none; margin-top: 20px; }}
+        .loader {{ border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto 8px; }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+        .loader-text {{ font-size: 12px; color: var(--text-muted); }}
+    </style>
+    <script>
+        function handleFileSelect(input, displayId) {{
+            var display = document.getElementById(displayId);
+            if (input.files && input.files.length > 0) {{
+                display.textContent = input.files.length === 1 ? "Selecionado: " + input.files[0].name : input.files.length + " arquivos selecionados";
+            }} else {{ display.textContent = ""; }}
+        }}
+        
+        function showLoader() {{
+            var loader = document.getElementById('loader');
+            var btn = document.getElementById('submit-btn');
             
-            .main-wrapper {{
-                margin-left: var(--sidebar-width);
-                margin-right: var(--ad-width);
-                flex-grow: 1;
-                display: flex; flex-direction: column;
-                min-height: 100vh;
-                box-sizing: border-box;
-            }}
-            
-            .hero-section {{
-                background-color: #ffffff;
-                border-bottom: 1px solid var(--border-color);
-                padding: 40px; text-align: left;
-            }}
-            .hero-container {{ max-width: 800px; margin: 0 auto; }}
-            .hero-section h2 {{ margin: 0 0 10px 0; font-size: 28px; font-weight: 800; color: var(--primary-dark); }}
-            .hero-section p {{ margin: 0; font-size: 15px; color: var(--text-muted); line-height: 1.6; }}
-            
-            .content-area {{
-                flex-grow: 1;
-                display: flex; flex-direction: column; align-items: center; justify-content: center;
-                padding: 40px; box-sizing: border-box;
-            }}
-            .tool-container {{
-                background: var(--bg-card);
-                padding: 40px; border-radius: 12px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-                border: 1px solid var(--border-color);
-                max-width: 460px; width: 100%; text-align: center;
-            }}
-            .tool-title {{ color: var(--primary-dark); margin: 0 0 8px 0; font-size: 20px; font-weight: 700; }}
-            .tool-desc {{ color: var(--text-muted); font-size: 13px; margin-bottom: 24px; line-height: 1.4; }}
-            
-            .file-dropzone {{
-                border: 2px dashed #cbd5e1; background-color: var(--primary-light);
-                border-radius: 10px; padding: 30px 20px; margin-bottom: 24px;
-                cursor: pointer; transition: all 0.2s ease; position: relative;
-            }}
-            .file-dropzone:hover {{ border-color: var(--primary); background-color: #e0f2fe; }}
-            .file-dropzone i {{ font-size: 36px; color: var(--primary); margin-bottom: 10px; }}
-            .file-dropzone p {{ margin: 0; font-size: 14px; color: #334155; font-weight: 500; }}
-            .file-dropzone small {{ display: block; margin-top: 5px; color: var(--text-muted); font-size: 11px; }}
-            .file-dropzone input[type="file"] {{ position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }}
-            .file-name-display {{ margin-top: 8px; font-size: 13px; color: var(--primary); font-weight: 600; word-break: break-all; }}
-            
-            button {{
-                background-color: var(--primary); color: white; border: none; padding: 12px 24px;
-                border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; width: 100%;
-                transition: background 0.15s ease;
-            }}
-            button:hover {{ background-color: var(--accent); }}
-            
-            .ad-sidebar-right {{
-                position: fixed; right: 0; top: 0; width: var(--ad-width); height: 100vh;
-                background-color: #f1f5f9; border-left: 1px solid var(--border-color);
-                display: flex; align-items: center; justify-content: center; z-index: 90;
-            }}
-            .ad-banner-bottom {{
-                width: 100%; padding: 20px 0; background-color: #f1f5f9;
-                border-top: 1px solid var(--border-color); text-align: center; margin-top: auto;
-                box-sizing: border-box;
-            }}
-            .ad-box {{
-                background: #e2e8f0; border: 1px dashed #cbd5e1; color: #94a3b8;
-                font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
-                display: flex; align-items: center; justify-content: center; border-radius: 4px;
-            }}
-            .ad-vertical {{ width: 160px; height: 600px; }}
-            .ad-horizontal {{ width: 728px; height: 90px; margin: 0 auto; }}
-            
-            .loader-container {{ display: none; margin-top: 20px; }}
-            .loader {{ border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; margin: 0 auto 8px; }}
-            @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
-            .loader-text {{ font-size: 12px; color: var(--text-muted); }}
-        </style>
-        <script>
-            function handleFileSelect(input, displayId) {
-                const display = document.getElementById(displayId);
-                if (input.files && input.files.length > 0) {
-                    display.textContent = input.files.length === 1 ? "Selecionado: " + input.files[0].name : input.files.length + " arquivos selecionados";
-                } else { display.textContent = ""; }
-            }
-            
-            function showLoader() {
-                const loader = document.getElementById('loader');
-                const btn = document.getElementById('submit-btn');
-                
-                loader.style.display = 'block';
-                btn.style.display = 'none';
-                
-                setTimeout(function() {
-                    loader.style.display = 'none';
-                    btn.style.display = 'block';
-                }, 6000); 
-            }
-        </script>
-    </head>
-    <body>
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <i class="fa-solid fa-bolt"></i>
-                <h1>Converte<span>Ai</span></h1>
-            </div>
-            <div class="sidebar-menu">
-                {sidebar_html}
+            loader.style.display = 'block';
+            btn.style.display = 'none';
+        }}
+    </script>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="fa-solid fa-bolt"></i>
+            <h1>Converte<span>Ai</span></h1>
+        </div>
+        <div class="sidebar-menu">
+            {sidebar_html}
+        </div>
+    </div>
+    
+    <div class="main-wrapper">
+        <div class="hero-section">
+            <div class="hero-container">
+                <h2>Conversão Inteligente de Arquivos</h2>
+                <p>Bem-vindo ao Converte Ai. Plataforma rápida, leve e adaptada para nuvem. Limite operacional de até {MAX_FILE_SIZE_MB}MB por processamento para máxima performance.</p>
             </div>
         </div>
         
-        <div class="main-wrapper">
-            <div class="hero-section">
-                <div class="hero-container">
-                    <h2>Conversão Inteligente de Arquivos</h2>
-                    <p>Bem-vindo ao Converte Ai. Plataforma rápida, leve e adaptada para nuvem. Limite operacional de até {MAX_FILE_SIZE_MB}MB por processamento para máxima performance.</p>
+        <div class="content-area">
+            <div class="tool-container">
+                {conteudo_pagina}
+                <div id="loader" class="loader-container">
+                    <div class="loader"></div>
+                    <div class="loader-text">Processando documento seguro...</div>
                 </div>
             </div>
-            
-            <div class="content-area">
-                <div class="tool-container">
-                    {conteudo_pagina}
-                    <div id="loader" class="loader-container">
-                        <div class="loader"></div>
-                        <div class="loader-text">Processando documento seguro...</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="ad-banner-bottom">
-                <div class="ad-box ad-horizontal">Espaço para Anúncio (728x90)</div>
-            </div>
         </div>
-        <div class="ad-sidebar-right">
-            <div class="ad-box ad-vertical">Espaço para Anúncio (160x600)</div>
+        
+        <div class="ad-banner-bottom">
+            <div class="ad-box ad-horizontal">Espaço para Anúncio (728x90)</div>
         </div>
-    </body>
-    </html>
-    '''
+    </div>
+    <div class="ad-sidebar-right">
+        <div class="ad-box ad-vertical">Espaço para Anúncio (160x600)</div>
+    </div>
+</body>
+</html>'''
+    return html_retorno
+
+# ==============================================================================
+# ROTA DE MAPA DO SITE (SITEMAP.XML PARA SEO)
+# ==============================================================================
+@app.route('/sitemap.xml', methods=['GET'])
+def sitemap():
+    """Gera o mapa XML de maneira dinâmica para indexação em indexadores de busca."""
+    host = request.host_url.rstrip('/')
+    rotas = [
+        '/', '/juntar-view', '/dividir-view', '/pdf-to-word-view', 
+        '/pdf-to-excel-view', '/pdf-to-pptx-view', '/pdf-to-image-view', 
+        '/word-to-pdf-view', '/excel-to-pdf-view'
+    ]
+    
+    xml_linhas = ['<?xml version="1.0" encoding="UTF-8"?>']
+    xml_linhas.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    
+    for rota in rotas:
+        xml_linhas.append('  <url>')
+        xml_linhas.append(f'    <loc>{host}{rota}</loc>')
+        xml_linhas.append('    <changefreq>weekly</changefreq>')
+        xml_linhas.append('    <priority>0.8</priority>')
+        xml_linhas.append('  </url>')
+        
+    xml_linhas.append('</urlset>')
+    xml_completo = "\n".join(xml_linhas)
+    
+    return Response(xml_completo, mimetype='application/xml')
 
 # ==============================================================================
 # ROTAS OPERACIONAIS ATIVAS
@@ -752,5 +774,4 @@ def excel_to_pdf():
         if os.path.exists(caminho_xlsx): os.remove(caminho_xlsx)
 
 if __name__ == '__main__':
-    # Roda localmente apenas se chamado direto
     app.run(debug=True)
