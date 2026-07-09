@@ -314,6 +314,9 @@ def layout_base(conteudo_pagina, ferramenta_ativa):
 # ==============================================================================
 # ROTA DE MAPA DO SITE (SITEMAP.XML PARA SEO)
 # ==============================================================================
+# ==============================================================================
+# ROTA DE MAPA DO SITE (SITEMAP.XML PARA SEO)
+# ==============================================================================
 @app.route('/sitemap.xml', methods=['GET'])
 def sitemap():
     host = request.host_url.rstrip('/')
@@ -333,7 +336,7 @@ def sitemap():
         xml_linhas.append('    <priority>0.8</priority>')
         xml_linhas.append('  </url>')
         
-    xml_linhas.append('<urlset>')
+    xml_linhas.append('</urlset>')  # <--- Corrigido aqui! Adicionada a barra '/' de fechamento.
     xml_completo = "\n".join(xml_linhas)
     
     return Response(xml_completo, mimetype='application/xml')
